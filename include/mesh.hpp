@@ -1,4 +1,5 @@
 #pragma once
+#include <list>
 #include <vector>
 
 namespace manifold {
@@ -7,27 +8,82 @@ namespace manifold {
   struct Loop;
   struct Edge;
   struct Vert;
+
+  template<typename Type, size_t ChunkSize = 256>
+  struct Pool {
+    Pool() {
+      Chunk* first_chunk = chunks.emplace_back(new Chunk);
+      for (size_t i = 0; i < ChunkSize; ++i)
+        free_list.push_back(&first_chunk->items[i]);
+    }
+    ~Pool() {
+      for (Chunk* chunk : chunks)
+        delete chunk;
+      free_list.clear();
+    }
+    Type* alloc() {
+      if (free_list.empty()) {
+        Chunk* new_chunk = chunks.emplace_back(new Chunk);
+        for (size_t i = 0; i < ChunkSize; ++i)
+          free_list.push_back(&new_chunk->items[i]);
+      }
+      Type* item = free_list.front();
+      free_list.pop_front();
+      return item;
+    }
+    void free(Type* ptr) { free_list.push_back(ptr); }
+    size_t size() const { return chunks.size() * ChunkSize - free_list.size(); }
+    bool in_used(const Type* ptr) const {
+      // FIXME: Trusting the input pointer is allocated from this pool.
+      for (const Type* item : free_list)
+        if (ptr == item)
+          return false;
+      return true;
+    }
+    template<typename Fn>
+    Type* find_if(Fn predicate) {
+      for (Chunk* chunk : chunks)
+        for (Type& item : chunk->items)
+          if (predicate(item) && in_used(&item))
+            return &item;
+      return nullptr;
+    }
+
+  private:
+    struct Chunk { Type items[ChunkSize]; };
+    std::vector<Chunk*> chunks;
+    std::list<Type*> free_list;
+  };
   
   struct Face {
     Loop* loop = nullptr;
   };
 
   struct Loop {
-    Loop(Edge* edge, Vert* vert) : edge(edge), vert(vert) {}
     Edge* edge = nullptr;
     Vert* vert = nullptr;
     Face* face = nullptr;
   };
 
+  struct DiskLink {
+    void append(Vert* vert, Edge* edge);
+    void remove(Vert* vert, Edge* edge);
+    Edge* next = nullptr;
+    Edge* prev = nullptr;
+  };
+
   struct Edge {
-    Edge(Vert* a, Vert* b) : verts { a, b } {}
-    Vert* verts[2] = { nullptr, nullptr };
+    DiskLink* disklink_at(Vert* vert);
+    Vert* v1 = nullptr;
+    Vert* v2 = nullptr;
     Loop* loop = nullptr;
+    DiskLink v1_disk, v2_disk;
   };
 
   struct Vert {
-    Vert(float x, float y, float z) : x(x), y(y), z(z), edge(nullptr) {}
-    float x = 0.f, y = 0.f, z = 0.f;
+    float x = 0.f;
+    float y = 0.f;
+    float z = 0.f;
     Edge* edge = nullptr;
   };
 
@@ -45,10 +101,10 @@ namespace manifold {
     size_t vert_count() const { return verts.size(); }
 
   private:
-    std::vector<Face> faces;
-    std::vector<Loop> loops;
-    std::vector<Edge> edges;
-    std::vector<Vert> verts;
+    Pool<Face> faces;
+    Pool<Loop> loops;
+    Pool<Edge> edges;
+    Pool<Vert> verts;
   };
 
 } // namespace manifold
