@@ -57,12 +57,15 @@ namespace manifold {
   
   struct Face {
     Loop* loop = nullptr;
+    int vert_count = 0;
   };
 
   struct Loop {
-    Edge* edge = nullptr;
     Vert* vert = nullptr;
+    Edge* edge = nullptr;
     Face* face = nullptr;
+    Loop* next = nullptr;
+    Loop* prev = nullptr;
   };
 
   struct DiskLink {
@@ -94,11 +97,15 @@ namespace manifold {
     Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices);
     Vert* create_vertex(float x, float y, float z);
     Edge* create_edge(Vert* a, Vert* b);
+    Face* create_face(Vert* verts[], size_t count);
 
     size_t face_count() const { return faces.size(); }
     size_t loop_count() const { return loops.size(); }
     size_t edge_count() const { return edges.size(); }
     size_t vert_count() const { return verts.size(); }
+
+  private:
+    Loop* create_loop(Vert* v, Edge* e, Face* f);
 
   private:
     Pool<Face> faces;
