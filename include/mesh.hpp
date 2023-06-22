@@ -48,6 +48,13 @@ namespace manifold {
             return &item;
       return nullptr;
     }
+    template<typename Fn>
+    void for_each(Fn func) {
+      for (Chunk* chunk : chunks)
+        for (Type& item : chunk->items)
+          if (in_used(&item))
+            func(item);
+    }
 
   private:
     struct Chunk { Type items[ChunkSize]; };
@@ -103,6 +110,8 @@ namespace manifold {
     size_t loop_count() const { return loops.size(); }
     size_t edge_count() const { return edges.size(); }
     size_t vert_count() const { return verts.size(); }
+
+    void to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices);
 
   private:
     Loop* create_loop(Vert* v, Edge* e, Face* f);

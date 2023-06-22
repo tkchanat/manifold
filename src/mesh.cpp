@@ -1,4 +1,5 @@
 #include <mesh.hpp>
+#include <unordered_map>
 
 namespace manifold {
   
@@ -132,6 +133,33 @@ namespace manifold {
     else if (vert == v2)
       return &v2_disk;
     return nullptr;
+  }
+
+  void Mesh::to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) {
+    vertices.clear();
+    indices.clear();
+    vertices.reserve(verts.size());
+    std::unordered_map<const Vert*, size_t> indices_map;
+    verts.for_each([&](const Vert& vert) {
+      indices_map[&vert] = vertices.size();
+      vertices.push_back(Vec3f { vert.x, vert.y, vert.z });
+    });
+    faces.for_each([&](const Face& face) {
+      // Triangulate face
+      if (!face.loop || face.vert_count < 3) return;
+      const size_t i0 = indices_map[face.loop->vert];
+      const Loop* curr = face.loop->next;
+      const Loop* next = curr->next;
+      for (size_t i = 0; i < face.vert_count - 2; ++i) {
+        const size_t i1 = indices_map[curr->vert];
+        const size_t i2 = indices_map[next->vert];
+        indices.push_back(i0);
+        indices.push_back(i1);
+        indices.push_back(i2);
+        curr = next;
+        next = next->next;
+      }
+    });
   }
 
 } // namespace manifold
