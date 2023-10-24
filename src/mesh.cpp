@@ -87,12 +87,66 @@ namespace manifold {
     return face;
   }
 
+  void Mesh::remove_vertex(Vert* vert) {
+    if (vert->edge)
+      remove_edge(vert->edge);
+    verts.free(vert);
+  }
+
+  void Mesh::remove_edge(Edge* edge) {
+    if (edge->loop)
+      remove_loop(edge->loop);
+
+    // Remove reference in vertices
+    if (edge == edge->v1->edge)
+      edge->v1->edge = edge->v1_disk.next != edge ? edge->v1_disk.next : nullptr;
+    if (edge == edge->v2->edge)
+      edge->v2->edge = edge->v2_disk.next != edge ? edge->v2_disk.next : nullptr;
+
+    // Remove from linked lists
+    edge->v1_disk.remove(edge->v1, edge);
+    edge->v2_disk.remove(edge->v2, edge);
+
+    edges.free(edge);
+  }
+
+  void Mesh::remove_face(Face* face) {
+    faces.free(face);
+  }
+
   Loop* Mesh::create_loop(Vert* vert, Edge* edge, Face* face) {
     Loop* loop = loops.alloc();
     loop->vert = vert;
     loop->edge = edge;
     loop->face = face;
     return loop;
+  }
+
+  void Mesh::remove_loop(Loop* loop) {
+    // null iff loop is called from RemoveFace
+    if (loop->face) {
+      // Trigger removing other loops, and this one again with loop->face == null
+      remove_face(loop->face);
+      return;
+    }
+
+    // remove from radial linked list
+    if (loop->next == loop) {
+      loop->edge->loop = nullptr;
+    }
+    else {
+      loop->prev->next = loop->next;
+      loop->next->prev = loop->prev;
+      if (loop->edge->loop == loop) {
+        loop->edge->loop = loop->next;
+      }
+    }
+
+    // forget other loops of the same face so thet they get released from memory
+    loop->next = nullptr;
+    loop->prev = nullptr;
+
+    loops.free(loop);
   }
 
   void DiskLink::append(Vert* vert, Edge* edge) {
@@ -140,17 +194,17 @@ namespace manifold {
     indices.clear();
     vertices.reserve(verts.size());
     std::unordered_map<const Vert*, size_t> indices_map;
-    verts.for_each([&](const Vert& vert) {
-      indices_map[&vert] = vertices.size();
-      vertices.push_back(Vec3f { vert.x, vert.y, vert.z });
-    });
-    faces.for_each([&](const Face& face) {
+    for (const Vert* vert : verts) {
+      indices_map[vert] = vertices.size();
+      vertices.push_back(Vec3f { vert->x, vert->y, vert->z });
+    }
+    for (const Face* face : faces) {
       // Triangulate face
-      if (!face.loop || face.vert_count < 3) return;
-      const size_t i0 = indices_map[face.loop->vert];
-      const Loop* curr = face.loop->next;
+      if (!face->loop || face->vert_count < 3) return;
+      const size_t i0 = indices_map[face->loop->vert];
+      const Loop* curr = face->loop->next;
       const Loop* next = curr->next;
-      for (size_t i = 0; i < face.vert_count - 2; ++i) {
+      for (size_t i = 0; i < face->vert_count - 2; ++i) {
         const size_t i1 = indices_map[curr->vert];
         const size_t i2 = indices_map[next->vert];
         indices.push_back(i0);
@@ -159,7 +213,7 @@ namespace manifold {
         curr = next;
         next = next->next;
       }
-    });
+    }
   }
 
 } // namespace manifold

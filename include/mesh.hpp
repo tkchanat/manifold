@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <unordered_set>
 #include <list>
 #include <vector>
 
@@ -12,56 +14,50 @@ namespace manifold {
   template<typename Type, size_t ChunkSize = 256>
   struct Pool {
     Pool() {
-      Chunk* first_chunk = chunks.emplace_back(new Chunk);
+      Chunk& first_chunk = chunks.emplace_back();
       for (size_t i = 0; i < ChunkSize; ++i)
-        free_list.push_back(&first_chunk->items[i]);
+        free_list.push_back(&first_chunk[i]);
     }
     ~Pool() {
-      for (Chunk* chunk : chunks)
-        delete chunk;
+      chunks.clear();
+      in_used.clear();
       free_list.clear();
     }
     Type* alloc() {
       if (free_list.empty()) {
-        Chunk* new_chunk = chunks.emplace_back(new Chunk);
+        Chunk& new_chunk = chunks.emplace_back();
         for (size_t i = 0; i < ChunkSize; ++i)
-          free_list.push_back(&new_chunk->items[i]);
+          free_list.push_back(&new_chunk[i]);
       }
       Type* item = free_list.front();
       free_list.pop_front();
+      in_used.insert(item);
       return item;
     }
-    void free(Type* ptr) { free_list.push_back(ptr); }
-    size_t size() const { return chunks.size() * ChunkSize - free_list.size(); }
-    bool in_used(const Type* ptr) const {
-      // FIXME: Trusting the input pointer is allocated from this pool.
-      for (const Type* item : free_list)
-        if (ptr == item)
-          return false;
-      return true;
+    void free(Type* ptr) {
+      in_used.erase(ptr);
+      free_list.push_back(ptr);
     }
+    size_t size() const { return chunks.size() * ChunkSize - free_list.size(); }
     template<typename Fn>
     Type* find_if(Fn predicate) {
-      for (Chunk* chunk : chunks)
-        for (Type& item : chunk->items)
-          if (predicate(item) && in_used(&item))
-            return &item;
+      for (auto it = begin(); it != end(); ++it)
+        if (predicate(**it))
+          return *it;
       return nullptr;
     }
-    template<typename Fn>
-    void for_each(Fn func) {
-      for (Chunk* chunk : chunks)
-        for (Type& item : chunk->items)
-          if (in_used(&item))
-            func(item);
-    }
+
+    auto begin() const { return in_used.begin(); }
+    auto end()   const { return in_used.end(); }
 
   private:
-    struct Chunk { Type items[ChunkSize]; };
-    std::vector<Chunk*> chunks;
+    using Chunk = std::array<Type, ChunkSize>;
+    // struct Chunk { Type items[ChunkSize]; };
+    std::vector<Chunk> chunks;
+    std::unordered_set<Type*> in_used;
     std::list<Type*> free_list;
   };
-  
+
   struct Face {
     Loop* loop = nullptr;
     int vert_count = 0;
@@ -100,11 +96,14 @@ namespace manifold {
   struct Vec3f { float x, y, z; };
 
   struct Mesh {
-  public:
+    Mesh() = default;
     Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices);
     Vert* create_vertex(float x, float y, float z);
     Edge* create_edge(Vert* a, Vert* b);
     Face* create_face(Vert* verts[], size_t count);
+    void remove_vertex(Vert* vert);
+    void remove_edge(Edge* edge);
+    void remove_face(Face* face);
 
     size_t face_count() const { return faces.size(); }
     size_t loop_count() const { return loops.size(); }
@@ -114,9 +113,10 @@ namespace manifold {
     void to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices);
 
   private:
-    Loop* create_loop(Vert* v, Edge* e, Face* f);
+    Loop* create_loop(Vert* vert, Edge* edge, Face* face);
+    void remove_loop(Loop* loop);
 
-  private:
+  public:
     Pool<Face> faces;
     Pool<Loop> loops;
     Pool<Edge> edges;
