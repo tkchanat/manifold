@@ -18,11 +18,8 @@ namespace manifold {
       for (size_t i = 0; i < ChunkSize; ++i)
         free_list.push_back(&first_chunk[i]);
     }
-    ~Pool() {
-      chunks.clear();
-      in_used.clear();
-      free_list.clear();
-    }
+    Pool(const Pool&) = delete;
+    Pool& operator=(const Pool&) = delete;
     Type* alloc() {
       if (free_list.empty()) {
         Chunk& new_chunk = chunks.emplace_back();
@@ -52,7 +49,6 @@ namespace manifold {
 
   private:
     using Chunk = std::array<Type, ChunkSize>;
-    // struct Chunk { Type items[ChunkSize]; };
     std::vector<Chunk> chunks;
     std::unordered_set<Type*> in_used;
     std::list<Type*> free_list;
@@ -97,6 +93,8 @@ namespace manifold {
 
   struct Mesh {
     Mesh() = default;
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
     Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices);
     Vert* create_vertex(float x, float y, float z);
     Edge* create_edge(Vert* a, Vert* b);
@@ -110,7 +108,7 @@ namespace manifold {
     size_t edge_count() const { return edges.size(); }
     size_t vert_count() const { return verts.size(); }
 
-    void to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices);
+    void to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) const;
 
   private:
     Loop* create_loop(Vert* vert, Edge* edge, Face* face);

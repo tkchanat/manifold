@@ -4,13 +4,17 @@
 namespace manifold {
   
   Mesh::Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices) {
+    // Create vertices first
+    std::vector<Vert*> verts(vertices.size());
+    for (size_t i = 0 ; i < vertices.size(); ++i) {
+      const Vec3f& v = vertices[i];
+      verts[i] = create_vertex(v.x, v.y, v.z);
+    }
+    // Create edges and faces
     for (size_t i = 0; i < indices.size(); i+=3) {
-      const Vec3f& a = vertices[i];
-      const Vec3f& b = vertices[i+1];
-      const Vec3f& c = vertices[i+2];
-      Vert* va = create_vertex(a.x, a.y, a.z);
-      Vert* vb = create_vertex(b.x, b.y, b.z);
-      Vert* vc = create_vertex(c.x, c.y, c.z);
+      uint32_t ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
+      const Vec3f& a = vertices[ia], b = vertices[ib], c = vertices[ic];
+      Vert* va = verts[ia], *vb = verts[ib], *vc = verts[ic];
       Vert* face_verts[3] = { va, vb, vc };
       create_edge(va, vb);
       create_edge(vb, vc);
@@ -189,7 +193,7 @@ namespace manifold {
     return nullptr;
   }
 
-  void Mesh::to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) {
+  void Mesh::to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) const {
     vertices.clear();
     indices.clear();
     vertices.reserve(verts.size());
