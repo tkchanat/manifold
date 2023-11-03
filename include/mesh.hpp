@@ -65,6 +65,8 @@ namespace manifold {
     Face* face = nullptr;
     Loop* next = nullptr;
     Loop* prev = nullptr;
+    Loop* radial_next = nullptr;
+    Loop* radial_prev = nullptr;
   };
 
   struct DiskLink {

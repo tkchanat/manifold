@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <mesh.hpp>
 #include <unordered_map>
 
@@ -92,14 +93,14 @@ namespace manifold {
   }
 
   void Mesh::remove_vertex(Vert* vert) {
-    if (vert->edge)
+    while (vert->edge)
       remove_edge(vert->edge);
     verts.free(vert);
   }
 
   void Mesh::remove_edge(Edge* edge) {
-    if (edge->loop)
-      remove_loop(edge->loop);
+    while (edge->loop)
+      remove_face(edge->loop->face);
 
     // Remove reference in vertices
     if (edge == edge->v1->edge)
@@ -115,6 +116,14 @@ namespace manifold {
   }
 
   void Mesh::remove_face(Face* face) {
+    if (!face)
+      return;
+    Loop* iter, *next, *first;
+    iter = first = face->loop;
+    do {
+      next = iter->next;
+      remove_loop(iter);
+    } while ((iter = next) != first);
     faces.free(face);
   }
 
@@ -123,33 +132,46 @@ namespace manifold {
     loop->vert = vert;
     loop->edge = edge;
     loop->face = face;
+
+    if (edge->loop == nullptr) {
+      edge->loop = loop;
+      loop->radial_next = loop->radial_prev = loop;
+    }
+    else {
+      loop->radial_prev = edge->loop;
+      loop->radial_next = edge->loop->radial_next;
+
+      edge->loop->radial_next->radial_prev = loop;
+      edge->loop->radial_next = loop;
+
+      edge->loop = loop;
+    }
+    /* loop is already in a radial cycle for a different edge */
+    assert(!(loop->edge && loop->edge != edge));
     return loop;
   }
 
   void Mesh::remove_loop(Loop* loop) {
-    // null iff loop is called from RemoveFace
-    if (loop->face) {
-      // Trigger removing other loops, and this one again with loop->face == null
-      remove_face(loop->face);
-      return;
-    }
-
-    // remove from radial linked list
-    if (loop->next == loop) {
-      loop->edge->loop = nullptr;
+    Edge* edge = loop->edge;
+    if (loop->radial_next != loop) {
+      if (loop == edge->loop) {
+        edge->loop = loop->radial_next;
+      }
+      loop->radial_next->radial_prev = loop->radial_prev;
+      loop->radial_prev->radial_next = loop->radial_next;
     }
     else {
-      loop->prev->next = loop->next;
-      loop->next->prev = loop->prev;
-      if (loop->edge->loop == loop) {
-        loop->edge->loop = loop->next;
+      assert(loop == edge->loop);
+      if (loop == edge->loop) {
+        edge->loop = nullptr;
       }
     }
 
-    // forget other loops of the same face so thet they get released from memory
-    loop->next = nullptr;
-    loop->prev = nullptr;
-
+    // loop is no longer in a radial cycle;
+    // empty the links to the cycle and the link back to an edge
+    loop->radial_next = nullptr;
+    loop->radial_prev = nullptr;
+    loop->edge = nullptr;
     loops.free(loop);
   }
 
