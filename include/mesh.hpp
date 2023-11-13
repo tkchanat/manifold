@@ -97,19 +97,20 @@ namespace manifold {
     Mesh() = default;
     Mesh(const Mesh&) = delete;
     Mesh& operator=(const Mesh&) = delete;
-    Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices);
     Vert* create_vertex(float x, float y, float z);
     Edge* create_edge(Vert* a, Vert* b);
     Face* create_face(Vert* verts[], size_t count);
     void remove_vertex(Vert* vert);
     void remove_edge(Edge* edge);
     void remove_face(Face* face);
+    void clear();
 
     size_t face_count() const { return faces.size(); }
     size_t loop_count() const { return loops.size(); }
     size_t edge_count() const { return edges.size(); }
     size_t vert_count() const { return verts.size(); }
 
+    void from_triangle_mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices);
     void to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) const;
 
   private:

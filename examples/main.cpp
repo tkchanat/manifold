@@ -11,7 +11,8 @@ int main() {
   const std::vector<uint32_t> indices = {
     0, 1, 2,
   };
-  Mesh mesh(vertices, indices);
+  Mesh mesh;
+  mesh.from_triangle_mesh(vertices, indices);
   printf("Hello manifold\n");
   printf("  - face count: %zu\n", mesh.face_count());
   printf("  - loop count: %zu\n", mesh.loop_count());

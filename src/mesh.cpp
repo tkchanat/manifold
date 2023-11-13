@@ -3,26 +3,6 @@
 #include <unordered_map>
 
 namespace manifold {
-  
-  Mesh::Mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices) {
-    // Create vertices first
-    std::vector<Vert*> verts(vertices.size());
-    for (size_t i = 0 ; i < vertices.size(); ++i) {
-      const Vec3f& v = vertices[i];
-      verts[i] = create_vertex(v.x, v.y, v.z);
-    }
-    // Create edges and faces
-    for (size_t i = 0; i < indices.size(); i+=3) {
-      uint32_t ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
-      const Vec3f& a = vertices[ia], b = vertices[ib], c = vertices[ic];
-      Vert* va = verts[ia], *vb = verts[ib], *vc = verts[ic];
-      Vert* face_verts[3] = { va, vb, vc };
-      create_edge(va, vb);
-      create_edge(vb, vc);
-      create_edge(vc, va);
-      create_face(face_verts, 3);
-    }
-  }
 
   Vert* Mesh::create_vertex(float x, float y, float z) {
     Vert* vert = verts.alloc();
@@ -175,6 +155,11 @@ namespace manifold {
     loops.free(loop);
   }
 
+  void Mesh::clear() {
+    while (verts.begin() != verts.end())
+      remove_vertex(*verts.begin());
+  }
+
   void DiskLink::append(Vert* vert, Edge* edge) {
     if (!vert->edge) {
       vert->edge = edge;
@@ -213,6 +198,28 @@ namespace manifold {
     else if (vert == v2)
       return &v2_disk;
     return nullptr;
+  }
+
+  void Mesh::from_triangle_mesh(const std::vector<Vec3f>& vertices, const std::vector<uint32_t>& indices) {
+    clear();
+
+    // Create vertices first
+    std::vector<Vert*> verts(vertices.size());
+    for (size_t i = 0 ; i < vertices.size(); ++i) {
+      const Vec3f& v = vertices[i];
+      verts[i] = create_vertex(v.x, v.y, v.z);
+    }
+    // Create edges and faces
+    for (size_t i = 0; i < indices.size(); i+=3) {
+      uint32_t ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
+      const Vec3f& a = vertices[ia], b = vertices[ib], c = vertices[ic];
+      Vert* va = verts[ia], *vb = verts[ib], *vc = verts[ic];
+      Vert* face_verts[3] = { va, vb, vc };
+      create_edge(va, vb);
+      create_edge(vb, vc);
+      create_edge(vc, va);
+      create_face(face_verts, 3);
+    }
   }
 
   void Mesh::to_triangle_mesh(std::vector<Vec3f>& vertices, std::vector<uint32_t>& indices) const {
